@@ -26,83 +26,88 @@ import requests.packages.urllib3
 requests.packages.urllib3.disable_warnings()
 from flickrapi import FlickrAPI
 
-FLICKR_PUBLIC = 'YOURKEYSTRING'
-FLICKR_SECRET = 'YOURSECRET'
+from local_settings import *
 
 # Create Flickr object
 
 flickr = FlickrAPI(FLICKR_PUBLIC, FLICKR_SECRET, format='parsed-json')
-extras='url_o'
+extras = 'url_o'
 
 # Create the AlchemyAPI object
 alchemyapi = AlchemyAPI()
 
+
 def getFlickrPic(keyword):
-	choice = random.randint(0,5)
+    wallcandidate = flickr.photos.search(
+        text=keyword, per_page=5, extras=extras, sort='interestingness-desc', license='2,3,4,5,6,7')
+    photos = wallcandidate['photos']
 
-	wallcandidate = flickr.photos.search(text=keyword, per_page=5, extras=extras, sort='interestingness-desc', license='2,3,4,5,6,7')
-	photos = wallcandidate['photos']
-		
-	pick = photos['photo'][choice]
+    choice = random.randint(0, len(photos['photo']) - 1)
+    pick = photos['photo'][choice]
 
-	wides = {k:v for k,v in pick.iteritems() if ('height_o' in k or 'width_o' in k) }
-	
-	if int(wides['width_o']) >= 1280 and int(wides['height_o']) >= 900:
-		return pick['url_o']
-	else:
-		return "None"
+    wides = {k: v for k, v in pick.iteritems() if (
+        'height_o' in k or 'width_o' in k)}
+
+    if int(wides['width_o']) >= 1280 and int(wides['height_o']) >= 900:
+        return pick['url_o']
+    else:
+        return "None"
+
 
 def getKeywords(lyrics):
-	words = []
+    words = []
 
-	response = alchemyapi.keywords('text', lyrics, {'sentiment': 1})
+    response = alchemyapi.keywords('text', lyrics, {'sentiment': 1})
 
-	if response['status'] == 'OK':
-		for keyword in response['keywords']:
-			words.append(keyword['text'].encode('utf-8'))
-	else:
-		return nil
+    if response['status'] == 'OK':
+        for keyword in response['keywords']:
+            words.append(keyword['text'].encode('utf-8'))
+    
+    return words
 
-	return words
 
 def getEntities(lyrics):
-	entities = []
+    entities = []
 
-	response = alchemyapi.entities('text', lyrics, {'sentiment': 1})
+    response = alchemyapi.entities('text', lyrics, {'sentiment': 1})
 
-	if response['status'] == 'OK':
-		for entity in response['entities']:
-			entities.append(entity['text'].encode('utf-8'))
+    if response['status'] == 'OK':
+        for entity in response['entities']:
+            entities.append(entity['text'].encode('utf-8'))
 
-	else:
-		return nil
+    return entities
 
-	return entities
 
 def getWebLyrics(artist, song_title):
-	try:
-		lyrics=(PyLyrics.getLyrics(artist,song_title))
-		if lyrics.find("data-image-key")<0:
-			return lyrics
-		else:
-			return song_title
+    try:
+        lyrics = PyLyrics.getLyrics(artist, song_title)
+        if lyrics.find("data-image-key") < 0:
+            return lyrics
+        else:
+            return song_title
 
-	except ValueError:
-		return song_title
+    except ValueError:
+        return song_title
+
 
 def buildSearchString(song_title, song_keywords):
-	x = random.randint(0,100)
+    # x = random.randint(0, 100)
 
-	if x<33:
-		return song_title
-	else:
-		flickr_search_string = random.choice(song_keywords) 
-		return flickr_search_string
+    # if x < 33:
+    #     return song_title
+    # else:
+    #     flickr_search_string = random.choice(song_keywords)
+    #     return flickr_search_string
+    flickr_search_string = random.choice(song_keywords)
+    return flickr_search_string
 
-if len(sys.argv)<2:
-	sys.exit(1)
+
+
+if len(sys.argv) < 2:
+    sys.exit(1)
 else:
-	song = ' '.join([str(foo) for foo in sys.argv[1:]])
+    song = ' '.join([str(foo) for foo in sys.argv[1:]])
+
 
 # removes things in square brackets and parenthesis
 
@@ -115,10 +120,21 @@ print("---")
 song_lyrics = getWebLyrics(artist, song_title)
 print(song_lyrics)
 
+print(getKeywords(song_lyrics))
+print(getEntities(song_lyrics))
+
 song_keywords = getKeywords(song_lyrics) + getEntities(song_lyrics)
+
+song_keywords = list(set(song_keywords) - set(STOPWORDS))
+
+
 search_string = buildSearchString(song_title, song_keywords)
 
 print("---")
 print("Using search string:" + search_string)
-subprocess.call(['setwalluri.sh', getFlickrPic(search_string)])
-subprocess.call(['setwall.sh'])
+
+url = getFlickrPic(search_string)
+print("Flickr url: " + url)
+
+subprocess.call(['./setwalluri.sh', url])
+subprocess.call(['./setwall.sh'])

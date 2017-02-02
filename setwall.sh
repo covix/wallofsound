@@ -22,4 +22,4 @@ fi
 
 WALLURI=`cat $WALLDIR/WALLURI`
 
-gsettings set org.gnome.desktop.background picture-uri $WALLURI
+osascript -e "tell application \"Finder\" to set desktop picture to \"$WALLURI\" as POSIX file"
